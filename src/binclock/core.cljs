@@ -101,10 +101,9 @@
      (reify
        om/IWillMount
        (will-mount [_]
-         (go (loop []
+         (go (while true
                (om/update! app assoc :time (time->bits (get-time)))
-               (<! (cljs.core.async/timeout 1000))
-               (recur))))
+               (<! (cljs.core.async/timeout 1000)))))
        om/IRender
        (render [_]
          (dom/div nil
