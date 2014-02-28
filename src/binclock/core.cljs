@@ -1,8 +1,15 @@
 (ns binclock.core
+  (:require-macros [cljs.core.async.macros :refer [go]])
   (:require [om.core :as om :include-macros true]
-            [om.dom :as dom :include-macros true]))
+            [weasel.repl :as ws-repl]
+            [om.dom :as dom :include-macros true]
+            [cljs.core.async :refer [put! chan <!]]))
+
+
 (comment
+  ;; don't want this with nrepl, i guess?
   (enable-console-print!))
+
 
 (extend-type boolean
   ICloneable
@@ -87,19 +94,38 @@
 (def app-state (atom {:time (time->bits (get-time))
                       :legend [8 4 2 1]}))
 
-(om/root
- app-state
- (fn [{:keys [legend time] :as app} owner]
-   (reify
-     om/IWillMount
-     (will-mount [_]
-       (js/setInterval
-        (fn [] (om/update! time #(time->bits (get-time)))) 1000))
-     om/IRender
-     (render [_]
-       (dom/div nil
-                (om/build legend-column legend)
-                (om/build column-pair (:hours time))
-                (om/build column-pair (:minutes time))
-                (om/build column-pair (:seconds time))))))
- (.getElementById js/document "content"))
+(def a-handle
+  (om/root
+   app-state
+   (fn [{:keys [legend time] :as app} owner]
+     (reify
+       om/IWillMount
+       (will-mount [_]
+         (go (loop []
+               (om/update! app assoc :time (time->bits (get-time)))
+               (<! (cljs.core.async/timeout 1000))
+               (recur))))
+       om/IRender
+       (render [_]
+         (dom/div nil
+                  (om/build legend-column legend)
+                  (om/build column-pair (:hours time))
+                  (om/build column-pair (:minutes time))
+                  (om/build column-pair (:seconds time))))))
+   (.getElementById js/document "content")))
+
+
+(defn ^:export connect
+  []
+  ;; TODO: auto-reconnect
+  (ws-repl/connect "ws://localhost:9001" :verbose false))
+
+
+(comment
+
+  ;; manually update the state
+  ;; raw clojure swap! works from out here, just not allowed from inside of any om code.
+  (swap! app-state update-in [:time]  #(time->bits (get-time)))
+
+
+  )

@@ -1,5 +1,7 @@
 *~
 out/
+.nrepl-port
+.repl/
 *.map
 target/
 binclock.js
